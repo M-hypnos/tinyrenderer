@@ -1,5 +1,9 @@
 ﻿#include "tgaimage.h"
 #include "model.h"
+#include <iostream>
+#include <string>
+#include <fstream>
+#include <sstream>
 
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red   = TGAColor(255, 0,   0,   255);
@@ -7,7 +11,12 @@ const TGAColor green = TGAColor(0, 255,   0,   255);
 
 int Width = 800;
 int Height = 800;
+int depth = 255;
 std::vector<float> zBuffer(Width * Height, -std::numeric_limits<float>::infinity());
+
+int* zbuffer = NULL;
+Vec3f light_dir(0, 0, -1);
+Vec3f camera(0, 0, 3);
 
 //lesson1 ------------------------------------------------------------
 //first
@@ -242,23 +251,65 @@ std::vector<float> zBuffer(Width * Height, -std::numeric_limits<float>::infinity
 
 //lesson3 ------------------------------------------------------------
 std::pair<float, float> getBarycentricCoordinates(Vec3f* pts, float x, float y) {
-    float beta = ((pts[0].y - pts[1].y) * x + (pts[1].x - pts[0].x) * y + pts[0].x * pts[1].y - pts[1].x * pts[0].y)
+    float gamma = ((pts[0].y - pts[1].y) * x + (pts[1].x - pts[0].x) * y + pts[0].x * pts[1].y - pts[1].x * pts[0].y)
         / ((pts[0].y - pts[1].y) * pts[2].x + (pts[1].x - pts[0].x) * pts[2].y + pts[0].x * pts[1].y - pts[1].x * pts[0].y);
-    float gamma = ((pts[0].y - pts[2].y) * x + (pts[2].x - pts[0].x) * y + pts[0].x * pts[2].y - pts[2].x * pts[0].y)
+    float beta = ((pts[0].y - pts[2].y) * x + (pts[2].x - pts[0].x) * y + pts[0].x * pts[2].y - pts[2].x * pts[0].y)
         / ((pts[0].y - pts[2].y) * pts[1].x + (pts[2].x - pts[0].x) * pts[1].y + pts[0].x * pts[2].y - pts[2].x * pts[0].y);
-    return { beta,gamma };
+    return {beta,gamma };
 }
 
-void triangle(Vec3f* pts, TGAImage& image, TGAColor color) {
+//void triangle(Vec3f* pts, TGAImage& image, TGAColor color) {
+//    float minX = image.get_width() - 1;
+//    float minY = image.get_height() - 1;
+//    float maxX = 0;
+//    float maxY = 0;
+//    for (int i = 0; i < 3; i++) {
+//        minX = std::min(minX, pts[i].x);
+//        maxX = std::max(maxX, pts[i].x);
+//        minY = std::min(minY, pts[i].y);
+//        maxY = std::max(maxY, pts[i].y);
+//    }
+//    minX = std::max(0.f, minX);
+//    maxX = std::min(maxX, (float)image.get_width() - 1);
+//    minY = std::max(0.f, minY);
+//    maxY = std::min(maxY, (float)image.get_height() - 1);
+//
+//    for (float x = minX; x <= maxX; x++) {
+//        for (float y = minY; y <= maxY; y++) {
+//            auto data = getBarycentricCoordinates(pts, x, y);
+//            float alpha = 1 - data.first - data.second;
+//            float beta = data.first;
+//            float gamma = data.second;
+//            if (alpha >= 0 && beta >= 0 && gamma >= 0) {
+//                auto z = alpha * pts[0].z + beta * pts[1].z + gamma * pts[2].z;
+//                int idx = int(x) + int(y) * Width;
+//                if (zBuffer[idx] < z) {
+//                    zBuffer[idx] = z;
+//                    image.set(x, y, color);
+//                }
+//            }
+//        }
+//    }
+//}
+
+void triangle(Vec3f* pts, Vec3f* ts, TGAImage& image, float maxNum, TGAImage& tex) {
+    Vec3f n = (pts[1] - pts[0]) ^ (pts[2] - pts[0]);
+    n.normalize();
+    Vec3f lightDir(0, 0, -1);
+    float I = n * lightDir;
+    if (I > 0) return;
     float minX = image.get_width() - 1;
     float minY = image.get_height() - 1;
     float maxX = 0;
     float maxY = 0;
+    Vec3f vf[3];
+
     for (int i = 0; i < 3; i++) {
-        minX = std::min(minX, pts[i].x);
-        maxX = std::max(maxX, pts[i].x);
-        minY = std::min(minY, pts[i].y);
-        maxY = std::max(maxY, pts[i].y);
+        vf[i] = Vec3f(int((pts[i].x / maxNum + 1.) * Width / 2. + .5), int((pts[i].y / maxNum + 1.) * Height / 2. + .5), pts[i].z);
+        minX = std::min(minX, vf[i].x);
+        maxX = std::max(maxX, vf[i].x);
+        minY = std::min(minY, vf[i].y);
+        maxY = std::max(maxY, vf[i].y);
     }
     minX = std::max(0.f, minX);
     maxX = std::min(maxX, (float)image.get_width() - 1);
@@ -267,23 +318,29 @@ void triangle(Vec3f* pts, TGAImage& image, TGAColor color) {
 
     for (float x = minX; x <= maxX; x++) {
         for (float y = minY; y <= maxY; y++) {
-            auto data = getBarycentricCoordinates(pts, x, y);
-            float alpha = 1 - data.first - data.second;
-            float beta = data.first;
-            float gamma = data.second;
-            if (alpha >= 0 && beta >= 0 && gamma >= 0) {
-                auto z = alpha * pts[0].z + beta * pts[1].z + gamma * pts[2].z;
-                int idx = int(x) + int(y) * Width;
-                if (zBuffer[idx] < z) {
-                    zBuffer[idx] = z;
-                    image.set(x, y, color);
-                }
+            if (x > 600 && y > 500) x += 0.01;
+            auto data = getBarycentricCoordinates(vf, x, y);
+            auto beta = data.first;
+            auto gamma = data.second;
+            auto alpha = 1 - beta - gamma;
+            if (alpha < -0.001 || beta < -0.001 || gamma < -0.001) continue;
+            auto z = alpha * pts[0].z + beta * pts[1].z + gamma * pts[2].z;
+            int idx = int(x + y * Width);
+            if (zBuffer[idx] < z) {
+                zBuffer[idx] = z;
+
+                auto uv = ts[0] * alpha + ts[1] * beta + ts[2] * gamma;
+                auto c = tex.get(uv.x * tex.get_width(), uv.y * tex.get_height());
+
+                //image.set(x, y, TGAColor(-I * 255, -I * 255, -I * 255, 255));
+                image.set(x, y, TGAColor(-I * c.r, -I * c.g, -I * c.b));
             }
         }
     }
 }
 
 //lesson3 ------------------------------------------------------------
+
 
 int main(int argc, char** argv) {
     //lesson1 ------------------------------------------------------------
@@ -356,10 +413,14 @@ int main(int argc, char** argv) {
     // 
     //lesson3 ------------------------------------------------------------
     TGAImage image(Width, Height, TGAImage::RGB);
-    Model* model = new Model("obj/Body #395857.obj");
+    Model* model = new Model("obj/african_head.obj");
     float maxNum = model->getMaxNum();
     Vec3f lightDir(0, 0, -1);
-    for (int i = 0; i < model->nfaces(); i++) {
+
+    TGAImage tex = TGAImage();
+    tex.read_tga_file("obj/african_head_diffuse.tga");
+    tex.flip_vertically();
+    /*for (int i = 0; i < model->nfaces(); i++) {
         std::vector<int> face = model->face(i);
         Vec3f vp[3];
         Vec3f vf[3];
@@ -374,6 +435,19 @@ int main(int argc, char** argv) {
         if (I < 0) {
             triangle(vp, image, TGAColor(-I * 255, -I * 255, -I * 255, 255));
         }
+    }*/
+    for (int i = 0; i < model->nfaces(); i++) {
+        std::vector<int> face = model->face(i);
+        Vec3f vp[3];
+        std::vector<int> tface = model->tface(i);
+        Vec3f vt[3];
+        for (int j = 0; j < 3; j++) {
+            Vec3f v0 = model->vert(face[j]);
+            vp[j] = v0;
+            Vec3f v1 = model->tverts(tface[j]);
+            vt[j] = v1;
+        }
+        triangle(vp, vt, image, maxNum, tex);
     }
     //lesson3 ------------------------------------------------------------
 

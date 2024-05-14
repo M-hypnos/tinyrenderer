@@ -5,7 +5,7 @@
 #include <vector>
 #include "model.h"
 
-Model::Model(const char *filename) : verts_(), faces_(), maxNum_(1.) {
+Model::Model(const char *filename) : verts_(), tverts_(), nverts_(), faces_(), tfaces_(), maxNum_(1.) {
     std::ifstream in;
     in.open (filename, std::ifstream::in);
     if (in.fail()) return;
@@ -26,13 +26,35 @@ Model::Model(const char *filename) : verts_(), faces_(), maxNum_(1.) {
             verts_.push_back(v);
         } else if (!line.compare(0, 2, "f ")) {
             std::vector<int> f;
-            int itrash, idx;
+            std::vector<int> tf;
+            int itrash, idx, tidx;
             iss >> trash;
-            while (iss >> idx >> trash >> itrash >> trash >> itrash) {
+            while (iss >> idx >> trash >> tidx >> trash >> itrash) {
                 idx--; // in wavefront obj all indices start at 1, not zero
                 f.push_back(idx);
+                tidx--;
+                tf.push_back(tidx);
             }
             faces_.push_back(f);
+            tfaces_.push_back(tf);
+        }
+        else if (!line.compare(0, 2, "vt")) {
+            iss >> trash >> trash;
+            Vec3f vt;
+            for (int i = 0; i < 3; i++) {
+                iss >> vt.raw[i];
+                
+            }
+            tverts_.push_back(vt);
+        }
+        else if (!line.compare(0, 2, "vn")) {
+            iss >> trash >> trash;
+            Vec3f vn;
+            for (int i = 0; i < 3; i++) {
+                iss >> vn.raw[i];
+                
+            }
+            nverts_.push_back(vn);
         }
     }
     std::cerr << "# v# " << verts_.size() << " f# "  << faces_.size() << std::endl;
@@ -53,8 +75,20 @@ std::vector<int> Model::face(int idx) {
     return faces_[idx];
 }
 
+std::vector<int> Model::tface(int idx) {
+    return tfaces_[idx];
+}
+
 Vec3f Model::vert(int i) {
     return verts_[i];
+}
+
+Vec3f Model::tverts(int i) {
+    return tverts_[i];
+}
+
+Vec3f Model::nverts(int i) {
+    return nverts_[i];
 }
 
 float Model::getMaxNum() {

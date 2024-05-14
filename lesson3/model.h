@@ -8,6 +8,9 @@ class Model {
 private:
 	std::vector<Vec3f> verts_;
 	std::vector<std::vector<int> > faces_;
+	std::vector<std::vector<int> > tfaces_;
+	std::vector<Vec3f> tverts_;
+	std::vector<Vec3f> nverts_;
 	float maxNum_;
 public:
 	Model(const char *filename);
@@ -15,7 +18,10 @@ public:
 	int nverts();
 	int nfaces();
 	Vec3f vert(int i);
+	Vec3f tverts(int i);
+	Vec3f nverts(int i);
 	std::vector<int> face(int idx);
+	std::vector<int> tface(int idx);
 	float getMaxNum();
 };
 
