@@ -73,11 +73,17 @@ void Rasterizer::triangle(Vec4f* pts, IShader& shader, TGAImage& image) {
             auto beta = data.first;
             auto gamma = data.second;
 
-            float depth = pts[0][2] * alpha + pts[1][2] * beta + pts[2][2] * gamma;
+            auto a1 = alpha / pts[0][3];
+            auto b1 = beta / pts[1][3];
+            auto g1 = gamma / pts[2][3];
+            Vec3f bc(a1, b1, g1);
+            bc = bc / (bc.x + bc.y + bc.z);
+
+            float depth = pts[0][2] * bc.x + pts[1][2] * bc.y + pts[2][2] * bc.z;
             if (alpha < -0.01 || beta < -0.01 || gamma < -0.01) continue;
             int idx = int(x + y * width_);
             if (zBuffer_[idx] > depth) continue;
-            bool discard = shader.fragment(Vec3f(alpha,beta,gamma), color);
+            bool discard = shader.fragment(bc, color);
             if (!discard) {
                 zBuffer_[idx] = depth;
                 image.set(x, y, color);

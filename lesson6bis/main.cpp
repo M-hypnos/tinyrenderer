@@ -73,7 +73,7 @@ struct Shader :public IShader {
         Vec3f v = model->vert(model->face(iface)[vertIdx]);
         uv.set_col(vertIdx, model->tverts(model->tface(iface)[vertIdx]));
         vp[vertIdx] = v;
-        n.set_col(vertIdx, model->nverts(model->nface(iface)[vertIdx]));
+        n.set_col(vertIdx, proj<3>(rasterizer->getModelView().invert_transpose() * embed<4>(model->nverts(model->nface(iface)[vertIdx]), 0.f)).normalize());
         return MVP * embed<4>(v);
     }
     virtual bool fragment(Vec3f barycentricCoordinates, TGAColor& color) {
@@ -89,7 +89,7 @@ struct Shader :public IShader {
         float f = 1.f / (u1 * v2 - u2 * v1);
         Vec3f T = (e1 * v2 - e2 * v1) * f;
         T.normalize();
-        //T = proj<3>(rasterizer->getModelView() * embed<4>(T, 0.f)).normalize();
+        T = proj<3>(rasterizer->getModelView() * embed<4>(T, 0.f)).normalize();
 
         T = T - N * (T * N);
         T.normalize();
@@ -100,23 +100,35 @@ struct Shader :public IShader {
         TBN.set_col(0, T);
         TBN.set_col(1, B);
         TBN.set_col(2, N);
-        Vec2f texcoords = uv * barycentricCoordinates;
-        Vec3f normal = TBN * model->getNormal(texcoords.x, texcoords.y);
 
-        float I = std::max(0.f, normal * light_dir);
-        color = model->getDiffuseColor(texcoords.x, texcoords.y) * I;
+        Vec2f texcoords = uv * barycentricCoordinates;
+        Vec3f normal = (TBN * model->getNormal(texcoords.x, texcoords.y)).normalize();
+
+
+        Vec3f l = proj<3>(rasterizer->getModelView() * embed<4>(light_dir)).normalize();
+
+        float diff = std::max(0.f, normal * l);
+        Vec3f r = (normal * (normal * l * 2.f) - l).normalize();
+        float spec = std::pow(std::max(r.z, 0.0f), model->getSpecularColor(texcoords.x, texcoords.y));
+        TGAColor c = model->getDiffuseColor(texcoords.x, texcoords.y);
+        color = c;
+        for (int i = 0; i < 3; i++) color[i] = std::min<float>(5 + c[i] * (diff + .6 * spec), 255);
 
         return false;
     }
 };
 
+void drawModel(Shader& shader, std::string filename, TGAImage& image) {
+    model = new Model(("obj"+ filename+".obj").c_str());
+    model->loadDiffuseTexture(("obj"+filename+"_diffuse.tga").c_str());
+    model->loadNormalTexture(("obj" + filename + "_nm_tangent.tga").c_str());
+    model->loadSpecularTexture(("obj" + filename + "_spec.tga").c_str());
+    rasterizer->draw(model, shader, image);
+    delete model;
+}
+
 int main(int argc, char** argv) {
     TGAImage image(Width, Height, TGAImage::RGB);
-
-    model = new Model("obj/african_head.obj");
-    model->loadDiffuseTexture("obj/african_head_diffuse.tga");
-    model->loadNormalTexture("obj/african_head_nm_tangent.tga");
-    model->loadSpecularTexture("obj/african_head_spec.tga");
     camera = new Camera(Vec3f(1, 1, 3), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
     rasterizer = new Rasterizer(viewport(Width / 8, Height / 8, Width * 3 / 4, Height * 3 / 4), Width, Height);
 
@@ -124,7 +136,14 @@ int main(int argc, char** argv) {
     rasterizer->setProjection(camera->getProjection());
     
     Shader shader;
-    rasterizer->draw(model, shader, image);
+
+    /*drawModel(shader, "/boggie/body", image);
+    drawModel(shader, "/boggie/head", image);
+    drawModel(shader, "/boggie/eyes", image);*/
+    drawModel(shader, "/african_head/african_head", image);
+    drawModel(shader, "/african_head/african_head_eye_inner", image);
+    //drawModel(shader, "/african_head/african_head_eye_outer", image);
+    //drawModel(shader, "/diablo3_pose/diablo3_pose", image);
 
 	image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
 	image.write_tga_file("output.tga");
