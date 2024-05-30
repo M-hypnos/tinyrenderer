@@ -37,162 +37,75 @@ Matrix viewport(int x, int y, int width, int height) {
     return m;
 }
 
-struct GouraudShader:public IShader
-{
-    Vec3f intensity;
+//struct Shader : public IShader {
+//    mat<2, 3, float> uv;
+//    Matrix MVP = rasterizer->getProjection() * rasterizer->getModelView();
+//    Matrix MVPT = MVP.invert_transpose();
+//    virtual Vec4f vertex(int iface, int vertIdx) {
+//        Vec3f v = model->vert(model->face(iface)[vertIdx]);
+//        uv.set_col(vertIdx, model->tverts(model->tface(iface)[vertIdx]));
+//        return MVP * embed<4>(v            
+//    }
+//    virtual bool fragment(Vec3f barycentricCoordinates, TGAColor& color) {
+//        Vec2f texcoords = uv * barycentricCoordinates;
+//        Vec3f normal = model->getNormal(texcoords.x, texcoords.y);
+//
+//        Vec3f n = proj<3>(MVPT * embed<4>(normal)).normalize();
+//        Vec3f l = proj<3>(MVP * embed<4>(light_dir)).normalize();
+//
+//        Vec3f r = (n * (n * l * 2.f) - l).normalize();
+//        float spec = pow(std::max(r.z, 0.0f), model->getSpecularColor(texcoords.x, texcoords.y));
+//        float diff = std::max(0.f, n * l);
+//        TGAColor c = model->getDiffuseColor(texcoords.x, texcoords.y);
+//        color = c;
+//        for (int i = 0; i < 3; i++) color[i] = std::min<float>(5 + c[i] * (diff + .6 * spec), 255);
+//        return false;
+//    }
+//};
 
-    virtual Vec4f vertex(int iface, int vertIdx) {
-        Vec3f n = model->nverts(model->nface(iface)[vertIdx]);
-        intensity[vertIdx] = std::max(0.f, n * light_dir);
-        Vec3f v = model->vert(model->face(iface)[vertIdx]);
-        return rasterizer->getProjection() * rasterizer->getModelView() * embed<4>(v);
-    }
-    virtual bool fragment(Vec3f barycentricCoordinates, TGAColor& color) {
-        float I = intensity * barycentricCoordinates;
-        //color = TGAColor(255, 255, 255) * I;
-        if (I > .85) I = 1;
-        else if (I > .60) I = .80;
-        else if (I > .45) I = .60;
-        else if (I > .30) I = .45;
-        else if (I > .15) I = .30;
-        else I = 0;
-        color = TGAColor(255, 155, 0) * I;
-        return false;
-    }
-};
-
-struct FlatShader :public IShader
-{
-    Vec3f vert[3];
-    virtual Vec4f vertex(int iface, int vertIdx) {
-
-        vert[vertIdx] = model->vert(model->face(iface)[vertIdx]);
-        return rasterizer->getProjection() * rasterizer->getModelView() * embed<4>(vert[vertIdx]);
-    }
-    virtual bool fragment(Vec3f barycentricCoordinates, TGAColor& color) {
-        Vec3f n = cross((vert[1] - vert[0]), (vert[2] - vert[0])).normalize();
-        float I = std::max(0.f, n * light_dir);
-        color = TGAColor(255, 255, 255) * I;
-        return false;
-    }
-};
-
-struct PhongShader :public IShader
-{
-    Vec3f n[3];
-    virtual Vec4f vertex(int iface, int vertIdx) {
-        n[vertIdx] = model->nverts(model->nface(iface)[vertIdx]);
-        Vec3f v = model->vert(model->face(iface)[vertIdx]);
-        return rasterizer->getProjection() * rasterizer->getModelView() * embed<4>(v);
-    }
-    virtual bool fragment(Vec3f barycentricCoordinates, TGAColor& color) {
-        Vec3f normal = n[0] * barycentricCoordinates.x + n[1] * barycentricCoordinates.y + n[2] * barycentricCoordinates.z;
-        float I = std::max(0.f, normal * light_dir);
-        color = TGAColor(255, 255, 255) * I;
-        return false;
-    }
-};
-
-struct GouraudTexShader :public IShader
-{
-    Vec3f intensity;
+struct Shader :public IShader {
     mat<2, 3, float> uv;
-    virtual Vec4f vertex(int iface, int vertIdx) {
-        Vec3f n = model->nverts(model->nface(iface)[vertIdx]);
-        intensity[vertIdx] = std::max(0.f, n * light_dir);
-        Vec3f v = model->vert(model->face(iface)[vertIdx]);
-        uv.set_col(vertIdx, model->tverts(model->tface(iface)[vertIdx]));
-        return rasterizer->getProjection() * rasterizer->getModelView() * embed<4>(v);
-    }
-    virtual bool fragment(Vec3f barycentricCoordinates, TGAColor& color) {
-        float I = intensity * barycentricCoordinates;
-        Vec2f texcoords = uv * barycentricCoordinates;
-        color = model->getDiffuseColor(texcoords.x, texcoords.y) * I;
-        return false;
-    }
-};
-
-struct FlatTexShader :public IShader
-{
-    Vec3f vert[3];
-    mat<2, 3, float> uv;
-    virtual Vec4f vertex(int iface, int vertIdx) {
-        vert[vertIdx] = model->vert(model->face(iface)[vertIdx]);
-        uv.set_col(vertIdx, model->tverts(model->tface(iface)[vertIdx]));
-        return rasterizer->getProjection() * rasterizer->getModelView() * embed<4>(vert[vertIdx]);
-    }
-    virtual bool fragment(Vec3f barycentricCoordinates, TGAColor& color) {
-        Vec3f n = cross((vert[1] - vert[0]), (vert[2] - vert[0])).normalize();
-        float I = std::max(0.f, n * light_dir);
-        Vec2f texcoords = uv * barycentricCoordinates;
-        color = model->getDiffuseColor(texcoords.x, texcoords.y) * I;
-        return false;
-    }
-};
-
-struct PhongTexShader :public IShader
-{
-    Vec3f n[3];
-    mat<2, 3, float> uv;
-    virtual Vec4f vertex(int iface, int vertIdx) {
-        n[vertIdx] = model->nverts(model->nface(iface)[vertIdx]);
-        Vec3f v = model->vert(model->face(iface)[vertIdx]);
-        uv.set_col(vertIdx, model->tverts(model->tface(iface)[vertIdx]));
-        return rasterizer->getProjection() * rasterizer->getModelView() * embed<4>(v);
-    }
-    virtual bool fragment(Vec3f barycentricCoordinates, TGAColor& color) {
-        Vec3f normal = n[0] * barycentricCoordinates.x + n[1] * barycentricCoordinates.y + n[2] * barycentricCoordinates.z;
-        float I = std::max(0.f, normal * light_dir);
-        Vec2f texcoords = uv * barycentricCoordinates;
-        color = model->getDiffuseColor(texcoords.x, texcoords.y) * I;
-        return false;
-    }
-};
-
-struct normalTexShader :public IShader {
-    mat<2, 3, float> uv;
+    Vec3f vp[3];
     Matrix MVP = rasterizer->getProjection() * rasterizer->getModelView();
-    Matrix MVPT = MVP.invert_transpose();
+    Matrix MVPT = (rasterizer->getProjection() * rasterizer->getModelView()).invert_transpose();
+    mat<3, 3, float> n;
     virtual Vec4f vertex(int iface, int vertIdx) {
         Vec3f v = model->vert(model->face(iface)[vertIdx]);
         uv.set_col(vertIdx, model->tverts(model->tface(iface)[vertIdx]));
-        return rasterizer->getProjection() * rasterizer->getModelView() * embed<4>(v);
-    }
-    virtual bool fragment(Vec3f barycentricCoordinates, TGAColor& color) {
-        Vec2f texcoords = uv * barycentricCoordinates;
-        Vec3f normal = model->getNormal(texcoords.x, texcoords.y);
-
-        Vec3f n = proj<3>(MVPT * embed<4>(normal)).normalize();
-        Vec3f l = proj<3>(MVP * embed<4>(light_dir)).normalize();
-
-        float I = std::max(0.f, n * l);
-        color = model->getDiffuseColor(texcoords.x, texcoords.y) * I;
-        return false;
-    }
-};
-
-struct Shader : public IShader {
-    mat<2, 3, float> uv;
-    Matrix MVP = rasterizer->getProjection() * rasterizer->getModelView();
-    Matrix MVPT = MVP.invert_transpose();
-    virtual Vec4f vertex(int iface, int vertIdx) {
-        Vec3f v = model->vert(model->face(iface)[vertIdx]);
-        uv.set_col(vertIdx, model->tverts(model->tface(iface)[vertIdx]));
+        vp[vertIdx] = v;
+        n.set_col(vertIdx, model->nverts(model->nface(iface)[vertIdx]));
         return MVP * embed<4>(v);
     }
     virtual bool fragment(Vec3f barycentricCoordinates, TGAColor& color) {
+        Vec3f N = (n * barycentricCoordinates).normalize();
+
+        float u1 = uv[0][1] - uv[0][0];
+        float v1 = uv[1][1] - uv[1][0];
+        float u2 = uv[0][2] - uv[0][0];
+        float v2 = uv[1][2] - uv[1][0];
+
+        Vec3f e1 = vp[1] - vp[0];
+        Vec3f e2 = vp[2] - vp[0];
+        float f = 1.f / (u1 * v2 - u2 * v1);
+        Vec3f T = (e1 * v2 - e2 * v1) * f;
+        T.normalize();
+        //T = proj<3>(rasterizer->getModelView() * embed<4>(T, 0.f)).normalize();
+
+        T = T - N * (T * N);
+        T.normalize();
+
+        Vec3f B = cross(N, T).normalize();
+
+        mat<3, 3, float> TBN;
+        TBN.set_col(0, T);
+        TBN.set_col(1, B);
+        TBN.set_col(2, N);
         Vec2f texcoords = uv * barycentricCoordinates;
-        Vec3f normal = model->getNormal(texcoords.x, texcoords.y);
+        Vec3f normal = TBN * model->getNormal(texcoords.x, texcoords.y);
 
-        Vec3f n = proj<3>(MVPT * embed<4>(normal)).normalize();
-        Vec3f l = proj<3>(MVP * embed<4>(light_dir)).normalize();
+        float I = std::max(0.f, normal * light_dir);
+        color = model->getDiffuseColor(texcoords.x, texcoords.y) * I;
 
-        Vec3f r = (n * (n * l * 2.f) - l).normalize();
-        float spec = pow(std::max(r.z, 0.0f), model->getSpecularColor(texcoords.x, texcoords.y));
-        float diff = std::max(0.f, n * l);
-        TGAColor c = model->getDiffuseColor(texcoords.x, texcoords.y);
-        color = c;
-        for (int i = 0; i < 3; i++) color[i] = std::min<float>(5 + c[i] * (diff + .6 * spec), 255);
         return false;
     }
 };
@@ -202,7 +115,7 @@ int main(int argc, char** argv) {
 
     model = new Model("obj/african_head.obj");
     model->loadDiffuseTexture("obj/african_head_diffuse.tga");
-    model->loadNormalTexture("obj/african_head_nm.tga");
+    model->loadNormalTexture("obj/african_head_nm_tangent.tga");
     model->loadSpecularTexture("obj/african_head_spec.tga");
     camera = new Camera(Vec3f(1, 1, 3), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
     rasterizer = new Rasterizer(viewport(Width / 8, Height / 8, Width * 3 / 4, Height * 3 / 4), Width, Height);
@@ -210,13 +123,6 @@ int main(int argc, char** argv) {
     rasterizer->setModelView(camera->getView());
     rasterizer->setProjection(camera->getProjection());
     
-    GouraudShader gshader;
-    FlatShader fshader;
-    PhongShader pshader;
-    GouraudTexShader gtshader;
-    FlatTexShader ftshader;
-    PhongTexShader ptshader;
-    normalTexShader nshader;
     Shader shader;
     rasterizer->draw(model, shader, image);
 

@@ -55,6 +55,11 @@ void Rasterizer::triangle(Vec4f* pts, IShader& shader, TGAImage& image) {
         maxY = std::max(maxY, pts[i][1] / pts[i][3]);
     }
 
+    maxX = std::min(maxX, width_ - 1.f);
+    maxY = std::min(maxY, width_ - 1.f);
+    minX = std::max(minX, 0.f);
+    minY = std::max(minY, 0.f);
+
     Vec3f sv[3];
     sv[0] = proj<3>(pts[0] / pts[0][3]);
     sv[1] = proj<3>(pts[1] / pts[1][3]);
@@ -67,13 +72,12 @@ void Rasterizer::triangle(Vec4f* pts, IShader& shader, TGAImage& image) {
             auto alpha = 1. - data.first - data.second;
             auto beta = data.first;
             auto gamma = data.second;
+
+            float depth = pts[0][2] * alpha + pts[1][2] * beta + pts[2][2] * gamma;
             if (alpha < -0.01 || beta < -0.01 || gamma < -0.01) continue;
-            float z = pts[0][2] * alpha + pts[1][2] * beta + pts[2][2] * gamma;
-            float w = pts[0][3] * alpha + pts[1][3] * beta + pts[2][3] * gamma;
-            float depth = z / w;
             int idx = int(x + y * width_);
             if (zBuffer_[idx] > depth) continue;
-            bool discard = shader.fragment(Vec3f(alpha, beta, gamma), color);
+            bool discard = shader.fragment(Vec3f(alpha,beta,gamma), color);
             if (!discard) {
                 zBuffer_[idx] = depth;
                 image.set(x, y, color);

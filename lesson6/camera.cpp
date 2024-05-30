@@ -16,6 +16,10 @@ Matrix Camera::getView() {
         t1[1][i] = y[i];
         t1[2][i] = z[i];
     }
+
+    Matrix t0 = Matrix::identity();
+    t0[0][1] = 1.5;
+
     return t1 * t;
 }
 
